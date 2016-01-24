@@ -150,3 +150,7 @@ func GetTokenLinks(c *echo.Context) error {
 	}
 	return c.JSON(http.StatusOK, LinksResponse{ResponseOK, links})
 }
+
+func DBStats(c *echo.Context) error {
+	return c.JSON(http.StatusOK, db.Stats())
+}
