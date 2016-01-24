@@ -3,7 +3,10 @@ package main
 import (
 	"log"
 	"net/http"
+	"os"
+	"strconv"
 
+	"github.com/codegangsta/cli"
 	"github.com/labstack/echo"
 	mw "github.com/labstack/echo/middleware"
 
@@ -15,32 +18,48 @@ import (
 )
 
 func main() {
-	uppath.UploadedPath = "uploaded/"
-	err := uppath.EnsureDirectories()
-	if err != nil {
-		log.Fatal(err)
+	app := cli.NewApp()
+	app.Usage = "Serve temporary and unimportant files"
+	app.Flags = []cli.Flag{
+		cli.IntFlag{
+			Name:  "port",
+			Value: 8080,
+			Usage: "The port which to listen",
+		},
 	}
+	app.Action = func(c *cli.Context) {
+		uppath.UploadedPath = "uploaded/"
+		err := uppath.EnsureDirectories()
+		if err != nil {
+			log.Fatal(err)
+		}
 
-	defer persistence.Close()
+		defer persistence.Close()
 
-	vise := echo.New()
+		vise := echo.New()
 
-	vise.SetLogPrefix("vise")
-	vise.Use(mw.Logger())
-	vise.Use(mw.Recover())
+		vise.SetLogPrefix("vise")
+		vise.Use(mw.Logger())
+		vise.Use(mw.Recover())
 
-	apiEndpoint := vise.Group("/api")
-	apiEndpoint.Post("/save", api.SaveFile)
-	apiEndpoint.Get("/links", api.GetLinks)
-	apiEndpoint.Get("/:token/links", api.GetTokenLinks)
+		apiEndpoint := vise.Group("/api")
+		apiEndpoint.Post("/save", api.SaveFile)
+		apiEndpoint.Get("/links", api.GetLinks)
+		apiEndpoint.Get("/:token/links", api.GetTokenLinks)
 
-	vise.Use(mw.Logger())
-	vise.Use(mw.Recover())
+		vise.Use(mw.Logger())
+		vise.Use(mw.Recover())
 
-	vise.Index("public/index.html")
-	vise.Get("/download/:token/:file", website.DownloadFile)
+		vise.Index("public/index.html")
+		vise.Get("/download/:token/:file", website.DownloadFile)
 
-	destroyer.Scan()
+		destroyer.Scan()
 
-	log.Fatal(http.ListenAndServe(":8080", vise))
+		port := strconv.Itoa(c.Int("port"))
+		if err != nil {
+			log.Fatal(err)
+		}
+		log.Fatal(http.ListenAndServe(":"+port, vise))
+	}
+	app.Run(os.Args)
 }
