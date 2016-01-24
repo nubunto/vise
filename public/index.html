@@ -18,7 +18,7 @@
 						<input type="file" name="file"><br><br>
 					</div>
 					<div class="file-path-wrapper">
-						<input class="file-path validate" type="text" placeholder="Upload file">
+						<input class="file-path" type="text" placeholder="Upload file">
 					</div>
 				</div>
 				<p>
@@ -46,65 +46,66 @@
 		</div>
 		<script>
 (function() {
-	function makeXhr(method, url, payload, fn) {
-		var xhr = new XMLHttpRequest();
-		xhr.open(method, url);
-		xhr.onreadystatechange = function() {
-			if (xhr.readyState == 4 && xhr.status == 200) {
-				fn(JSON.parse(xhr.responseText));
-			}
-		};
-		payload ? xhr.send(payload) : xhr.send();
-	}
-	function fileUpload(file) {
-		var fd = new FormData();
-		fd.append('file', file);
-		fd.append('days', document.querySelector('input[name=days]:checked').value);
-		fd.append('user-token', localStorage.getItem("user-token") || "");
-		makeXhr("POST", "/api/save", fd, function(data) {
-			if (!localStorage.getItem("user-token")) {
-				if (data.user_token)
-					localStorage.setItem(
-							"user-token",
-							data.user_token
-							);
-			}
-			loadLinks();
-		});
-	}
-	var actionForm = document.querySelector('#actionForm');
-	actionForm.onsubmit = function(e) {
-		e.preventDefault();
-		fileUpload(document.querySelector('input[type=file]').files[0]);
-	}
-	function clearNode(n) {
-		while(n.firstChild) {
-			n.removeChild(n.firstChild)
-		}
-	}
-	function loadLinks() {
-		if (localStorage.getItem('user-token')) {
-			makeXhr("GET",
-				"/" + localStorage.getItem('user-token') + "/links", 
-				null, 
-			function(data) {
-				var links = document.querySelector('#links');
-				clearNode(links);
-				for(var i = 0; i < data.links.length; i++) {
-					var url = data.links[i].url;
-					var anchor = document.createElement('a');
-					var div = document.createElement('div');
-					anchor.href = '' + url;
-					anchor.textContent = data.links[i].filename;
-					div.appendChild(anchor);
-					links.appendChild(div);
+	window.onload = function() {
+		function makeXhr(method, url, payload, fn) {
+			console.log('calling makeXhr');
+			var xhr = new XMLHttpRequest();
+			xhr.open(method, url);
+			xhr.onreadystatechange = function() {
+				if (xhr.readyState == 4 && xhr.status == 200) {
+					fn(JSON.parse(xhr.responseText));
 				}
+			};
+			payload ? xhr.send(payload) : xhr.send();
+		}
+		function fileUpload(file) {
+			var fd = new FormData();
+			fd.append('file', file);
+			fd.append('days', document.querySelector('input[name=days]:checked').value);
+			fd.append('user-token', localStorage.getItem("user-token") || "");
+			makeXhr("POST", "/api/save", fd, function(data) {
+				if (!localStorage.getItem("user-token")) {
+					if (data.user_token)
+						localStorage.setItem(
+								"user-token",
+								data.user_token
+								);
+				}
+				loadLinks();
 			});
 		}
-	}
-	window.onload = function() {
+		var actionForm = document.querySelector('#actionForm');
+		actionForm.onsubmit = function(e) {
+			e.preventDefault();
+			fileUpload(document.querySelector('input[type=file]').files[0]);
+		}
+		function clearNode(n) {
+			while(n.firstChild) {
+				n.removeChild(n.firstChild)
+			}
+		}
+		function loadLinks() {
+			if (localStorage.getItem('user-token')) {
+				makeXhr("GET",
+						"/api/" + localStorage.getItem('user-token') + "/links", 
+						null, 
+						function(data) {
+							var links = document.querySelector('#links');
+							clearNode(links);
+							for(var i = 0; i < data.links.length; i++) {
+								var url = data.links[i].url;
+								var anchor = document.createElement('a');
+								var div = document.createElement('div');
+								anchor.href = '' + url;
+								anchor.textContent = data.links[i].filename;
+								div.appendChild(anchor);
+								links.appendChild(div);
+							}
+						});
+			}
+		}
 		loadLinks();
-	};
+	}
 })();
 		</script>
 	</body>
