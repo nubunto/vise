@@ -29,11 +29,15 @@ func main() {
 	}
 	app.Action = func(c *cli.Context) {
 		uppath.UploadedPath = "uploaded/"
-		err := uppath.EnsureDirectories()
+		err := uppath.EnsureDirectories("data", "uploaded")
 		if err != nil {
 			log.Fatal(err)
 		}
 
+		err = persistence.Init()
+		if err != nil {
+			log.Fatal(err)
+		}
 		defer persistence.Close()
 
 		vise := echo.New()

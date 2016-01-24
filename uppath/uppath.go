@@ -5,8 +5,6 @@ import (
 	"mime/multipart"
 	"os"
 	"path"
-
-	//"github.com/nubunto/vise/persistence/types"
 )
 
 var UploadedPath string

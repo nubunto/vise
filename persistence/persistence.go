@@ -15,13 +15,13 @@ import (
 
 var db *bolt.DB
 
-func init() {
+func Init() error {
 	var err error
 	db, err = bolt.Open("data/vise.db", 0600, nil)
 	if err != nil {
-		log.Fatal(err)
+		return err
 	}
-	db.Update(func(tx *bolt.Tx) error {
+	return db.Update(func(tx *bolt.Tx) error {
 		_, err := tx.CreateBucketIfNotExists([]byte("users"))
 		if err != nil {
 			return errors.New("Fail to create bucket \"users\".")
