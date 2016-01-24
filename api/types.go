@@ -1,5 +1,9 @@
 package api
 
+import (
+	"github.com/nubunto/vise/persistence/types"
+)
+
 type (
 	APIResponse struct {
 		Ok      bool   `json:"ok"`
@@ -11,21 +15,7 @@ type (
 	}
 	LinksResponse struct {
 		APIResponse
-		Links []Link `json:"links"`
-	}
-)
-
-type (
-	FileInfo struct {
-		Filename      string `json:"filename"`
-		DaysAvailable int    `json:"days_available"`
-	}
-	UserFiles struct {
-		Files []FileInfo `json:"files"`
-	}
-	Link struct {
-		FileInfo
-		URL string `json:"url"`
+		Links []types.Link `json:"links"`
 	}
 )
 

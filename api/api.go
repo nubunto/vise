@@ -1,25 +1,17 @@
 package api
 
 import (
-	"encoding/json"
-	"fmt"
-	"io"
 	"net/http"
-	"os"
-	"path"
 	"strconv"
 
 	"code.google.com/p/go-uuid/uuid"
-	"github.com/boltdb/bolt"
 	"github.com/labstack/echo"
+
+	"github.com/nubunto/vise/persistence"
+	"github.com/nubunto/vise/persistence/types"
+	"github.com/nubunto/vise/uppath"
+	"github.com/nubunto/vise/website"
 )
-
-var UploadedPath = "uploaded/"
-var db *bolt.DB
-
-func DB(d *bolt.DB) {
-	db = d
-}
 
 func SaveFile(c *echo.Context) error {
 	token := c.Form("user-token")
@@ -37,67 +29,34 @@ func SaveFile(c *echo.Context) error {
 
 	file, fh, err := req.FormFile("file")
 	if err != nil {
-		fmt.Println("formfile err", err)
 		return err
 	}
 	defer file.Close()
 
-	directoryPath := path.Join(UploadedPath, token)
-	err = os.MkdirAll(directoryPath, 0755)
-	if err != nil {
-		fmt.Println("mkdir err", err)
-		return err
-	}
-
-	filePath := path.Join(directoryPath, fh.Filename)
-	dst, err := os.Create(filePath)
-	if err != nil {
-		fmt.Println("dst create err", err)
-		return err
-	}
-	defer dst.Close()
-
-	if _, err := io.Copy(dst, file); err != nil {
-		return err
-	}
-	err = db.Update(func(tx *bolt.Tx) error {
-		token := []byte(token)
-
-		b := tx.Bucket([]byte("users"))
-
-		userFiles := b.Get(token)
-
-		var files UserFiles
-		if userFiles == nil {
-			files = UserFiles{
-				Files: make([]FileInfo, 0),
-			}
-		} else {
-			err := json.Unmarshal(userFiles, &files)
-			if err != nil {
-				return err
-			}
-		}
-
-		files.Files = append(files.Files, FileInfo{fh.Filename, days})
-		marshaled, err := json.Marshal(files)
-		if err != nil {
-			return err
-		}
-		b.Put(token, marshaled)
-		return nil
-	})
+	err = uppath.UploadFile(file, fh, token)
 	if err != nil {
 		return err
 	}
+
+	err = persistence.UpdateFiles(types.FileInfo{fh.Filename, days}, token)
+	if err != nil {
+		return err
+	}
+
 	return c.JSON(http.StatusOK, FileUploadResponse{ResponseOK, token})
+}
+
+func uriBuilder(c *echo.Context) func(string, string) string {
+	return func(token, filename string) string {
+		return c.Echo().URI(website.DownloadFile, token, filename)
+	}
 }
 
 func GetLinks(c *echo.Context) error {
 	matchAll := func(string) bool {
 		return true
 	}
-	linksResponse, err := getTokenLinks(matchAll)
+	linksResponse, err := getTokenLinks(matchAll, uriBuilder(c))
 	if err != nil {
 		return err
 	}
@@ -109,40 +68,17 @@ func GetTokenLinks(c *echo.Context) error {
 	matchSpecific := func(b string) bool {
 		return b == userToken
 	}
-	linksResponse, err := getTokenLinks(matchSpecific)
+	linksResponse, err := getTokenLinks(matchSpecific, uriBuilder(c))
 	if err != nil {
 		return err
 	}
 	return c.JSON(http.StatusOK, linksResponse)
 }
 
-func getTokenLinks(match func(string) bool) (*LinksResponse, error) {
-	links := make([]Link, 0)
-	err := db.View(func(tx *bolt.Tx) error {
-		users := tx.Bucket([]byte("users"))
-		return users.ForEach(func(token, fileInfo []byte) error {
-			if match(string(token)) {
-				var files UserFiles
-				err := json.Unmarshal(fileInfo, &files)
-				if err != nil {
-					return err
-				}
-				for _, f := range files.Files {
-					links = append(links, Link{
-						FileInfo: f,
-						URL:      string(token) + "/" + f.Filename + "/download",
-					})
-				}
-			}
-			return nil
-		})
-	})
+func getTokenLinks(match func(string) bool, uriBuilder func(string, string) string) (*LinksResponse, error) {
+	links, err := persistence.GetLinks(match, uriBuilder)
 	if err != nil {
 		return nil, err
 	}
 	return &LinksResponse{ResponseOK, links}, nil
-}
-
-func DBStats(c *echo.Context) error {
-	return c.JSON(http.StatusOK, db.Stats())
 }
