@@ -61,7 +61,7 @@
 		fd.append('file', file);
 		fd.append('days', document.querySelector('input[name=days]:checked').value);
 		fd.append('user-token', localStorage.getItem("user-token") || "");
-		makeXhr("POST", "http://api.localhost:8080/save", fd, function(data) {
+		makeXhr("POST", "/api/save", fd, function(data) {
 			if (!localStorage.getItem("user-token")) {
 				if (data.user_token)
 					localStorage.setItem(
@@ -85,7 +85,7 @@
 	function loadLinks() {
 		if (localStorage.getItem('user-token')) {
 			makeXhr("GET",
-				"http://api.localhost:8080/" + localStorage.getItem('user-token') + "/links", 
+				"/" + localStorage.getItem('user-token') + "/links", 
 				null, 
 			function(data) {
 				var links = document.querySelector('#links');

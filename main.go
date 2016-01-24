@@ -18,16 +18,6 @@ import (
 	"github.com/nubunto/vise/destroyer"
 )
 
-type Hosts map[string]http.Handler
-
-func (h Hosts) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	if handler, ok := h[r.Host]; ok {
-		handler.ServeHTTP(w, r)
-	} else {
-		http.Error(w, "Not Found", http.StatusNotFound)
-	}
-}
-
 func dbInit(db *bolt.DB) {
 	db.Update(func(tx *bolt.Tx) error {
 		_, err := tx.CreateBucketIfNotExists([]byte("users"))
@@ -38,34 +28,50 @@ func dbInit(db *bolt.DB) {
 	})
 }
 
-func main() {
-	hosts := make(Hosts)
+func ensureDirectories(dirs ...string) error {
+	for _, dir := range dirs {
+		if err := os.MkdirAll(dir, 0755); err != nil {
+			return err
+		}
+	}
+	return nil
+}
 
-	apiEndpoint := echo.New()
-	apiEndpoint.SetLogPrefix("api")
-	apiEndpoint.Use(mw.Logger())
-	apiEndpoint.Use(mw.Recover())
-
+func dbOpen(dir string) *bolt.DB {
 	db, err := bolt.Open("data/vise.db", 0600, nil)
 	if err != nil {
 		log.Fatal(err)
 	}
+	return db
+}
+
+func main() {
+	err := ensureDirectories("data", "uploaded")
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	vise := echo.New()
+
+	vise.SetLogPrefix("vise")
+	vise.Use(mw.Logger())
+	vise.Use(mw.Recover())
+
+	db := dbOpen("data")
 	defer db.Close()
 	dbInit(db)
 
-	hosts["api.localhost:8080"] = apiEndpoint
+	api.DB(db)
+	apiEndpoint := vise.Group("/api")
+	apiEndpoint.Post("/save", api.SaveFile)
+	apiEndpoint.Get("/links", api.GetLinks)
+	apiEndpoint.Get("/:token/links", api.GetTokenLinks)
 
-	api.RegisterHandlers(apiEndpoint, db)
+	vise.Use(mw.Logger())
+	vise.Use(mw.Recover())
 
-	website := echo.New()
-	website.SetLogPrefix("site")
-	website.Use(mw.Logger())
-	website.Use(mw.Recover())
-
-	hosts["localhost:8080"] = website
-
-	website.Static("/", "public")
-	website.Get("/:token/:file/download", func(c *echo.Context) error {
+	vise.Index("public/index.html")
+	vise.Get("/:token/:file/download", func(c *echo.Context) error {
 		token, file := c.P(0), c.P(1)
 		filePath := path.Join(api.UploadedPath, token, file)
 
@@ -84,5 +90,5 @@ func main() {
 		return nil
 	})
 	destroyer.Scan(db)
-	log.Fatal(http.ListenAndServe(":8080", cors.Default().Handler(hosts)))
+	log.Fatal(http.ListenAndServe(":8080", cors.Default().Handler(vise)))
 }

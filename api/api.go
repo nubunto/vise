@@ -15,87 +15,120 @@ import (
 )
 
 var UploadedPath = "uploaded/"
+var db *bolt.DB
 
-func RegisterHandlers(e *echo.Echo, db *bolt.DB) {
-	commands := e.Group("/")
-	commands.Post("save", func(c *echo.Context) error {
-		token := c.Form("user-token")
-		if len(token) == 0 {
-			token = uuid.New()
-		}
+func DB(d *bolt.DB) {
+	db = d
+}
 
-		req := c.Request()
-		req.ParseMultipartForm(16 << 20)
+func SaveFile(c *echo.Context) error {
+	token := c.Form("user-token")
+	if len(token) == 0 {
+		token = uuid.New()
+	}
 
-		days, err := strconv.Atoi(c.Form("days"))
-		if err != nil {
-			return err
-		}
+	req := c.Request()
+	req.ParseMultipartForm(16 << 20)
 
-		file, fh, err := req.FormFile("file")
-		if err != nil {
-			fmt.Println("formfile err", err)
-			return err
-		}
-		defer file.Close()
+	days, err := strconv.Atoi(c.Form("days"))
+	if err != nil {
+		return err
+	}
 
-		directoryPath := path.Join(UploadedPath, token)
-		err = os.MkdirAll(directoryPath, 0755)
-		if err != nil {
-			fmt.Println("mkdir err", err)
-			return err
-		}
+	file, fh, err := req.FormFile("file")
+	if err != nil {
+		fmt.Println("formfile err", err)
+		return err
+	}
+	defer file.Close()
 
-		filePath := path.Join(directoryPath, fh.Filename)
-		dst, err := os.Create(filePath)
-		if err != nil {
-			fmt.Println("dst create err", err)
-			return err
-		}
-		defer dst.Close()
+	directoryPath := path.Join(UploadedPath, token)
+	err = os.MkdirAll(directoryPath, 0755)
+	if err != nil {
+		fmt.Println("mkdir err", err)
+		return err
+	}
 
-		if _, err := io.Copy(dst, file); err != nil {
-			return err
-		}
-		err = db.Update(func(tx *bolt.Tx) error {
-			token := []byte(token)
+	filePath := path.Join(directoryPath, fh.Filename)
+	dst, err := os.Create(filePath)
+	if err != nil {
+		fmt.Println("dst create err", err)
+		return err
+	}
+	defer dst.Close()
 
-			b := tx.Bucket([]byte("users"))
+	if _, err := io.Copy(dst, file); err != nil {
+		return err
+	}
+	err = db.Update(func(tx *bolt.Tx) error {
+		token := []byte(token)
 
-			userFiles := b.Get(token)
+		b := tx.Bucket([]byte("users"))
 
-			var files UserFiles
-			if userFiles == nil {
-				files = UserFiles{
-					Files: make([]FileInfo, 0),
-				}
-			} else {
-				err := json.Unmarshal(userFiles, &files)
-				if err != nil {
-					return err
-				}
+		userFiles := b.Get(token)
+
+		var files UserFiles
+		if userFiles == nil {
+			files = UserFiles{
+				Files: make([]FileInfo, 0),
 			}
-
-			files.Files = append(files.Files, FileInfo{fh.Filename, days})
-			marshaled, err := json.Marshal(files)
+		} else {
+			err := json.Unmarshal(userFiles, &files)
 			if err != nil {
 				return err
 			}
-			b.Put(token, marshaled)
-			return nil
-		})
+		}
+
+		files.Files = append(files.Files, FileInfo{fh.Filename, days})
+		marshaled, err := json.Marshal(files)
 		if err != nil {
 			return err
 		}
-		return c.JSON(http.StatusOK, FileUploadResponse{ResponseOK, token})
+		b.Put(token, marshaled)
+		return nil
 	})
-	commands.Get("links", func(c *echo.Context) error {
-		links := make([]Link, 0)
-		err := db.View(func(tx *bolt.Tx) error {
-			users := tx.Bucket([]byte("users"))
-			c := users.Cursor()
+	if err != nil {
+		return err
+	}
+	return c.JSON(http.StatusOK, FileUploadResponse{ResponseOK, token})
+}
 
-			for token, fileInfo := c.First(); token != nil; token, fileInfo = c.Next() {
+func GetLinks(c *echo.Context) error {
+	links := make([]Link, 0)
+	err := db.View(func(tx *bolt.Tx) error {
+		users := tx.Bucket([]byte("users"))
+		c := users.Cursor()
+
+		for token, fileInfo := c.First(); token != nil; token, fileInfo = c.Next() {
+			var files UserFiles
+			err := json.Unmarshal(fileInfo, &files)
+			if err != nil {
+				return err
+			}
+			for _, f := range files.Files {
+				links = append(links, Link{
+					FileInfo: f,
+					URL:      string(token) + "/" + f.Filename + "/download",
+				})
+			}
+		}
+		return nil
+	})
+	if err != nil {
+		return err
+	}
+	return c.JSON(http.StatusOK, LinksResponse{ResponseOK, links})
+}
+
+func GetTokenLinks(c *echo.Context) error {
+	userToken := c.P(0)
+	links := make([]Link, 0)
+	err := db.View(func(tx *bolt.Tx) error {
+		users := tx.Bucket([]byte("users"))
+		c := users.Cursor()
+
+		for token, fileInfo := c.First(); token != nil; token, fileInfo = c.Next() {
+			if string(token) == userToken {
 				var files UserFiles
 				err := json.Unmarshal(fileInfo, &files)
 				if err != nil {
@@ -107,42 +140,13 @@ func RegisterHandlers(e *echo.Echo, db *bolt.DB) {
 						URL:      string(token) + "/" + f.Filename + "/download",
 					})
 				}
+				break
 			}
-			return nil
-		})
-		if err != nil {
-			return err
 		}
-		return c.JSON(http.StatusOK, LinksResponse{ResponseOK, links})
+		return nil
 	})
-	commands.Get(":token/links", func(c *echo.Context) error {
-		userToken := c.P(0)
-		links := make([]Link, 0)
-		err := db.View(func(tx *bolt.Tx) error {
-			users := tx.Bucket([]byte("users"))
-			c := users.Cursor()
-
-			for token, fileInfo := c.First(); token != nil; token, fileInfo = c.Next() {
-				if string(token) == userToken {
-					var files UserFiles
-					err := json.Unmarshal(fileInfo, &files)
-					if err != nil {
-						return err
-					}
-					for _, f := range files.Files {
-						links = append(links, Link{
-							FileInfo: f,
-							URL:      string(token) + "/" + f.Filename + "/download",
-						})
-					}
-					break
-				}
-			}
-			return nil
-		})
-		if err != nil {
-			return err
-		}
-		return c.JSON(http.StatusOK, LinksResponse{ResponseOK, links})
-	})
+	if err != nil {
+		return err
+	}
+	return c.JSON(http.StatusOK, LinksResponse{ResponseOK, links})
 }
