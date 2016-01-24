@@ -22,7 +22,7 @@ func main() {
 	app.Usage = "Serve temporary and unimportant files"
 	app.Flags = []cli.Flag{
 		cli.IntFlag{
-			Name:  "port",
+			Name:  "port, p",
 			Value: 8080,
 			Usage: "The port which to listen",
 		},
@@ -50,7 +50,8 @@ func main() {
 		vise.Use(mw.Logger())
 		vise.Use(mw.Recover())
 
-		vise.Index("public/index.html")
+		website.LoadBox("public")
+		vise.Get("/", website.Index)
 		vise.Get("/download/:token/:file", website.DownloadFile)
 
 		destroyer.Scan()
