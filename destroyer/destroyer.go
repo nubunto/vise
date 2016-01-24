@@ -40,7 +40,6 @@ func Scan(db *bolt.DB) {
 					}
 
 					fileExistenceTime, availability := fileInfo.ModTime(), file.DaysAvailable
-					log.Println("File was created at", fileExistenceTime, "and his availability is", availability)
 					possibleDeleteDay := time.Now().Day()
 					fileExistenceDay := fileExistenceTime.Day()
 					if possibleDeleteDay-fileExistenceDay >= availability {
