@@ -94,41 +94,34 @@ func SaveFile(c *echo.Context) error {
 }
 
 func GetLinks(c *echo.Context) error {
-	links := make([]Link, 0)
-	err := db.View(func(tx *bolt.Tx) error {
-		users := tx.Bucket([]byte("users"))
-		c := users.Cursor()
-
-		for token, fileInfo := c.First(); token != nil; token, fileInfo = c.Next() {
-			var files UserFiles
-			err := json.Unmarshal(fileInfo, &files)
-			if err != nil {
-				return err
-			}
-			for _, f := range files.Files {
-				links = append(links, Link{
-					FileInfo: f,
-					URL:      string(token) + "/" + f.Filename + "/download",
-				})
-			}
-		}
-		return nil
-	})
+	matchAll := func(string) bool {
+		return true
+	}
+	linksResponse, err := getTokenLinks(matchAll)
 	if err != nil {
 		return err
 	}
-	return c.JSON(http.StatusOK, LinksResponse{ResponseOK, links})
+	return c.JSON(http.StatusOK, linksResponse)
 }
 
 func GetTokenLinks(c *echo.Context) error {
 	userToken := c.P(0)
+	matchSpecific := func(b string) bool {
+		return b == userToken
+	}
+	linksResponse, err := getTokenLinks(matchSpecific)
+	if err != nil {
+		return err
+	}
+	return c.JSON(http.StatusOK, linksResponse)
+}
+
+func getTokenLinks(match func(string) bool) (*LinksResponse, error) {
 	links := make([]Link, 0)
 	err := db.View(func(tx *bolt.Tx) error {
 		users := tx.Bucket([]byte("users"))
-		c := users.Cursor()
-
-		for token, fileInfo := c.First(); token != nil; token, fileInfo = c.Next() {
-			if string(token) == userToken {
+		return users.ForEach(func(token, fileInfo []byte) error {
+			if match(string(token)) {
 				var files UserFiles
 				err := json.Unmarshal(fileInfo, &files)
 				if err != nil {
@@ -140,15 +133,14 @@ func GetTokenLinks(c *echo.Context) error {
 						URL:      string(token) + "/" + f.Filename + "/download",
 					})
 				}
-				break
 			}
-		}
-		return nil
+			return nil
+		})
 	})
 	if err != nil {
-		return err
+		return nil, err
 	}
-	return c.JSON(http.StatusOK, LinksResponse{ResponseOK, links})
+	return &LinksResponse{ResponseOK, links}, nil
 }
 
 func DBStats(c *echo.Context) error {
