@@ -65,7 +65,6 @@ func main() {
 	apiEndpoint.Post("/save", api.SaveFile)
 	apiEndpoint.Get("/links", api.GetLinks)
 	apiEndpoint.Get("/:token/links", api.GetTokenLinks)
-	apiEndpoint.Get("/stats", api.DBStats)
 
 	vise.Use(mw.Logger())
 	vise.Use(mw.Recover())
@@ -82,8 +81,6 @@ func main() {
 		defer src.Close()
 
 		res := c.Response()
-		res.Header().Set("Content-Disposition", "attachment")
-
 		if _, err := io.Copy(res.Writer(), src); err != nil {
 			return err
 		}
