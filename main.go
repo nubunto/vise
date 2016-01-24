@@ -12,7 +12,6 @@ import (
 	"github.com/boltdb/bolt"
 	"github.com/labstack/echo"
 	mw "github.com/labstack/echo/middleware"
-	"github.com/rs/cors"
 
 	"github.com/nubunto/vise/api"
 	"github.com/nubunto/vise/destroyer"
@@ -66,6 +65,7 @@ func main() {
 	apiEndpoint.Post("/save", api.SaveFile)
 	apiEndpoint.Get("/links", api.GetLinks)
 	apiEndpoint.Get("/:token/links", api.GetTokenLinks)
+	apiEndpoint.Get("/stats", api.DBStats)
 
 	vise.Use(mw.Logger())
 	vise.Use(mw.Recover())
@@ -90,5 +90,5 @@ func main() {
 		return nil
 	})
 	destroyer.Scan(db)
-	log.Fatal(http.ListenAndServe(":8080", cors.Default().Handler(vise)))
+	log.Fatal(http.ListenAndServe(":8080", vise))
 }
