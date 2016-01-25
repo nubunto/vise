@@ -14,7 +14,6 @@ import (
 	"github.com/nubunto/vise/destroyer"
 	"github.com/nubunto/vise/persistence"
 	"github.com/nubunto/vise/uppath"
-	"github.com/nubunto/vise/website"
 )
 
 func main() {
@@ -26,9 +25,14 @@ func main() {
 			Value: 8080,
 			Usage: "The port which to listen",
 		},
+		cli.StringFlag{
+			Name:  "upload-path, u",
+			Value: "uploaded",
+			Usage: "The directory on which to save uploaded data",
+		},
 	}
 	app.Action = func(c *cli.Context) {
-		uppath.UploadedPath = "uploaded/"
+		uppath.UploadedPath = c.String("upload-path")
 		err := uppath.EnsureDirectories("data", "uploaded")
 		if err != nil {
 			log.Fatal(err)
@@ -50,13 +54,14 @@ func main() {
 		apiEndpoint.Post("/save", api.SaveFile)
 		apiEndpoint.Get("/links", api.GetLinks)
 		apiEndpoint.Get("/:token/links", api.GetTokenLinks)
+		apiEndpoint.Get("/download/:token/:file", api.DownloadFile)
 
 		vise.Use(mw.Logger())
 		vise.Use(mw.Recover())
 
-		website.LoadBox("public")
-		vise.Get("/", website.Index)
-		vise.Get("/download/:token/:file", website.DownloadFile)
+		assets := http.FileServer(assetFS())
+		vise.Get("/", assets)
+		vise.Get("/static/*", assets)
 
 		destroyer.Scan()
 
