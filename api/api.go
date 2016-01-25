@@ -1,7 +1,10 @@
 package api
 
 import (
+	"io"
 	"net/http"
+	"os"
+	"path"
 	"strconv"
 
 	"code.google.com/p/go-uuid/uuid"
@@ -10,7 +13,6 @@ import (
 	"github.com/nubunto/vise/persistence"
 	"github.com/nubunto/vise/persistence/types"
 	"github.com/nubunto/vise/uppath"
-	"github.com/nubunto/vise/website"
 )
 
 func SaveFile(c *echo.Context) error {
@@ -48,7 +50,7 @@ func SaveFile(c *echo.Context) error {
 
 func uriBuilder(c *echo.Context) func(string, string) string {
 	return func(token, filename string) string {
-		return c.Echo().URI(website.DownloadFile, token, filename)
+		return c.Echo().URI(DownloadFile, token, filename)
 	}
 }
 
@@ -81,4 +83,21 @@ func getTokenLinks(match func(string) bool, uriBuilder func(string, string) stri
 		return nil, err
 	}
 	return &LinksResponse{ResponseOK, links}, nil
+}
+
+func DownloadFile(c *echo.Context) error {
+	token, file := c.P(0), c.P(1)
+	filePath := path.Join(uppath.UploadedPath, token, file)
+
+	src, err := os.Open(filePath)
+	if err != nil {
+		return err
+	}
+	defer src.Close()
+
+	res := c.Response()
+	if _, err := io.Copy(res.Writer(), src); err != nil {
+		return err
+	}
+	return nil
 }
