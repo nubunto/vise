@@ -3,110 +3,13 @@
 	<head>
 		<meta charset="UTF-8">
 		<title>Vise</title>
-		<!-- Compiled and minified CSS -->
+		<script src="https://cdnjs.cloudflare.com/ajax/libs/mithril/0.2.2-rc.1/mithril.min.js"></script>
 		<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/materialize/0.97.5/css/materialize.min.css">
 		<script src="https://code.jquery.com/jquery-2.2.0.min.js"></script>
 		<script src="https://cdnjs.cloudflare.com/ajax/libs/materialize/0.97.5/js/materialize.min.js"></script>
 	</head>
 	<body>
-		<div class="container">
-			<h1>Vise</h1>
-			<form id="actionForm" method="POST" enctype="multipart/form-data">
-				<div class="file-field input-field">
-					<div class="btn">
-						<span>File</span>
-						<input type="file" name="file"><br><br>
-					</div>
-					<div class="file-path-wrapper">
-						<input class="file-path" type="text" placeholder="Upload file">
-					</div>
-				</div>
-				<p>
-				<input id="day3" type="radio" name="days" value="3">
-				<label for="day3">3 days</label>
-				</p>
-				<p>
-				<input id="day9" type="radio" name="days" value="9">
-				<label for="day9">9 days</label>
-				</p>
-				<p>
-				<input id="day12" type="radio" name="days" value="12">
-				<label for="day12">12 days</label>
-				</p>
-				<br>
-				<hr>
-				<input class="waves-effect waves-light btn" type="submit" value="Submit">
-			</form>
-			<div class="row">
-				<div class="col s12">
-					<h2>Uploaded Files</h2>
-					<div id="links"></div>
-				</div>
-			</div>
-		</div>
-		<script>
-(function() {
-	window.onload = function() {
-		function makeXhr(method, url, payload, fn) {
-			console.log('calling makeXhr');
-			var xhr = new XMLHttpRequest();
-			xhr.open(method, url);
-			xhr.onreadystatechange = function() {
-				if (xhr.readyState == 4 && xhr.status == 200) {
-					fn(JSON.parse(xhr.responseText));
-				}
-			};
-			payload ? xhr.send(payload) : xhr.send();
-		}
-		function fileUpload(file) {
-			var fd = new FormData();
-			fd.append('file', file);
-			fd.append('days', document.querySelector('input[name=days]:checked').value);
-			fd.append('user-token', localStorage.getItem("user-token") || "");
-			makeXhr("POST", "/api/save", fd, function(data) {
-				if (!localStorage.getItem("user-token")) {
-					if (data.user_token)
-						localStorage.setItem(
-								"user-token",
-								data.user_token
-								);
-				}
-				loadLinks();
-			});
-		}
-		var actionForm = document.querySelector('#actionForm');
-		actionForm.onsubmit = function(e) {
-			e.preventDefault();
-			fileUpload(document.querySelector('input[type=file]').files[0]);
-		}
-		function clearNode(n) {
-			while(n.firstChild) {
-				n.removeChild(n.firstChild)
-			}
-		}
-		function loadLinks() {
-			if (localStorage.getItem('user-token')) {
-				makeXhr("GET",
-						"/api/" + localStorage.getItem('user-token') + "/links", 
-						null, 
-						function(data) {
-							var links = document.querySelector('#links');
-							clearNode(links);
-							for(var i = 0; i < data.links.length; i++) {
-								var url = data.links[i].url;
-								var anchor = document.createElement('a');
-								var div = document.createElement('div');
-								anchor.href = '' + url;
-								anchor.textContent = data.links[i].filename;
-								div.appendChild(anchor);
-								links.appendChild(div);
-							}
-						});
-			}
-		}
-		loadLinks();
-	}
-})();
-		</script>
+		<div class="container" id="app"></div>
+		<script src="static/js/app.js"></script>
 	</body>
 </html>
