@@ -54,14 +54,14 @@ func main() {
 		apiEndpoint.Post("/save", api.SaveFile)
 		apiEndpoint.Get("/links", api.GetLinks)
 		apiEndpoint.Get("/:token/links", api.GetTokenLinks)
-		apiEndpoint.Get("/download/:token/:file", api.DownloadFile)
+		apiEndpoint.Get("/download/:file", api.DownloadFile)
 
 		vise.Use(mw.Logger())
 		vise.Use(mw.Recover())
 
 		assets := http.FileServer(assetFS())
 		vise.Get("/", assets)
-		vise.Get("/static/*", assets)
+		//vise.Get("/static/*", assets)
 
 		destroyer.Scan()
 
