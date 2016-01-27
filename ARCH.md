@@ -1,15 +1,13 @@
 # Vise Database Architecture.
 
-The current arch:
+The old arch:
 
     "users": Bucket {
         "[token]": "[information on files stored as a JSON]"
     }
 
-Not good for many reasons: file updating/listing requires json parsing.
+Was not good for many reasons: file updating/listing requires json parsing for each user.
 This could be faster.
-
-JSON parsing requires bounded structs; Changes in API need to be carefully planned otherwise old clients will break.
 
 The proposed arch:
 
@@ -30,10 +28,14 @@ This is also faster. To retrieve a user's files, we need to:
   * Make a slice of type Links
   * Find the bucket "users"
   * Scan all keys, parsing the value as JSON
-  * Scan all those values, adding them to the slice
+  * Scan all those values, adding them to the slice (there's another loop in here for each user entry)
   * Return the Links slice
 
-To find all files of a user:
+The second approach focuses on files rather than clients (which makes sense, since this is a anonymous file uploader).
+
+One of the caveats is that we build a directory for each file, although we can change that logic fairly easily
+
+To find all files of a user in the new architecture:
 
   * Make a slice of string
   * Cursor all keys of the "files" bucket,
