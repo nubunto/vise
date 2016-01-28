@@ -56,6 +56,21 @@ func main() {
 		apiEndpoint.Get("/:token/links", api.GetTokenLinks)
 		apiEndpoint.Get("/download/:file", api.DownloadFile)
 
+		private := vise.Group("/private")
+		private.Use(mw.BasicAuth(func(usr, pwd string) bool {
+			return usr == os.Getenv("VISE_USER") && pwd == os.Getenv("VISE_PWD")
+		}))
+		private.Get("/stats", func(c *echo.Context) error {
+			return c.JSON(http.StatusOK, persistence.DbStats())
+		})
+		private.Get("/inspect", func(c *echo.Context) error {
+			d, err := persistence.Inspect()
+			if err != nil {
+				return err
+			}
+			return c.JSON(http.StatusOK, d)
+		})
+
 		vise.Use(mw.Logger())
 		vise.Use(mw.Recover())
 

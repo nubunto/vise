@@ -40,25 +40,27 @@ func CheckExpiration() error {
 		filesCursor := files.Cursor()
 		for fileToken, _ := filesCursor.First(); fileToken != nil; fileToken, _ = filesCursor.Next() {
 			fileBucket := files.Bucket(fileToken)
-			// TODO: check if bucket exists.
-			created, err := time.Parse(time.UnixDate, string(fileBucket.Get([]byte("created-in"))))
+			log.Println("Scanning file token", string(fileToken))
+
+			possibleDeletionDate := time.Now()
+
+			var deleteDate time.Time
+			err := deleteDate.UnmarshalBinary(fileBucket.Get([]byte("delete-date")))
 			if err != nil {
-				log.Println("Time parse error:", err)
+				log.Println("Delete date unmarshal error:", err)
 				continue
 			}
-			availability, err := strconv.Atoi(string(fileBucket.Get([]byte("expires-in"))))
-			if err != nil {
-				log.Println("Days are in a strange format:", err)
-				continue
-			}
-			if created.Day()-time.Now().Day() >= availability {
-				filename := string(fileBucket.Get([]byte("filename")))
-				err = os.Remove(path.Join(string(fileToken), filename))
+			d, m, y := possibleDeletionDate.Date()
+			dd, mm, yy := deleteDate.Date()
+			log.Println("d m y: ", d, m, y, " dd mm yy: ", dd, mm, yy)
+			if d == dd && m == mm && y == yy {
+				log.Println("Removing file...")
+				err = os.RemoveAll(path.Join(uppath.UploadedPath, string(fileToken)))
 				if err != nil {
-					log.Println("Failed to remove file:", filename, " -", err)
+					log.Println("Failed to remove file:", fileToken, " -", err)
 					continue
 				}
-				fileBucket.Delete(fileToken)
+				files.DeleteBucket(fileToken)
 			}
 		}
 		return nil
@@ -108,4 +110,47 @@ func FindFile(token []byte) (*os.File, error) {
 
 func Save(f types.File) error {
 	return f.Save(db)
+}
+
+func DbStats() bolt.Stats {
+	return db.Stats()
+}
+
+func Inspect() ([]interface{}, error) {
+	ret := make([]interface{}, 0)
+	err := db.View(func(tx *bolt.Tx) error {
+		files := tx.Bucket([]byte("files"))
+		files.ForEach(func(fileToken, _ []byte) error {
+			fileInfo := files.Bucket(fileToken)
+			days, _ := strconv.Atoi(string(fileInfo.Get([]byte("expires-in"))))
+			var creationTime, deleteDate time.Time
+			var err error
+			err = creationTime.UnmarshalBinary(fileInfo.Get([]byte("creation-time")))
+			if err != nil {
+				log.Println("Created date unmarshal error:", err)
+			}
+			err = deleteDate.UnmarshalBinary(fileInfo.Get([]byte("delete-date")))
+			if err != nil {
+				log.Println("Delete date unmarshal error:", err)
+			}
+			data := struct {
+				Days       int
+				Filename   string
+				Created    string
+				DeleteDate string
+			}{
+				days,
+				string(fileInfo.Get([]byte("filename"))),
+				creationTime.String(),
+				deleteDate.String(),
+			}
+			ret = append(ret, data)
+			return nil
+		})
+		return nil
+	})
+	if err != nil {
+		return nil, err
+	}
+	return ret, nil
 }
