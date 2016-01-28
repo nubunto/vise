@@ -52,7 +52,6 @@ func CheckExpiration() error {
 			}
 			d, m, y := possibleDeletionDate.Date()
 			dd, mm, yy := deleteDate.Date()
-			log.Println("d m y: ", d, m, y, " dd mm yy: ", dd, mm, yy)
 			if d == dd && m == mm && y == yy {
 				log.Println("Removing file...")
 				err = os.RemoveAll(path.Join(uppath.UploadedPath, string(fileToken)))
