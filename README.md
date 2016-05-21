@@ -32,6 +32,22 @@ When you first submit an file, a lot of stuff is happening with Vise on the back
 
 On the front-end side, we keep this unique identifier locally using the browser storage. If you clear it, Vise will treat you like a new client.
 
+## The Vise API
+
+Vise provides an API, whose routes and parameters are described:
+
+ * `POST /api/save` note: all parameters are inside a FormData.
+  * file: File to be uploaded.
+  * days: Days which the file exists inside the server.
+  * The object returned contains:
+    * ok: boolean
+    * message: string
+    * user_token: string
+  * Note that it is the client's responsibility to ensure that subsequent calls to `/api/save` provide the token. Otherwise, the server will think that this is a completely new user and assign a different token.
+ * `GET /api/links` returns information about all the files. This is usually used for debugging purposes, but it is exposed anyway.
+ * `GET /api/:token/links` returns links for all of the token's associated files.
+ * There are also private information available via a JSON api. If you're interested, check out how to configure your vise in the file `main.go`.
+
 ## Vise is written in Go
 
 Which is, for itself, quite a feature.
