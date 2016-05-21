@@ -39,6 +39,7 @@ Vise provides an API, whose routes and parameters are described:
  * `POST /api/save` note: all parameters are inside a FormData.
   * file: File to be uploaded.
   * days: Days which the file exists inside the server.
+  * token: Optional. If provided, the server will store the file under this token. This token is provided for the first time this URL is called. It is not intended to be created by the user, although it could be used as such.
   * The object returned contains:
     * ok: boolean
     * message: string
