@@ -9,6 +9,7 @@ import (
 	"github.com/codegangsta/cli"
 	"github.com/labstack/echo"
 	mw "github.com/labstack/echo/middleware"
+	"github.com/labstack/echo/engine/standard"
 
 	"github.com/nubunto/vise/api"
 	"github.com/nubunto/vise/destroyer"
@@ -51,19 +52,19 @@ func main() {
 		vise.Use(mw.Recover())
 
 		apiEndpoint := vise.Group("/api")
-		apiEndpoint.Post("/save", api.SaveFile)
-		apiEndpoint.Get("/links", api.GetLinks)
-		apiEndpoint.Get("/:token/links", api.GetTokenLinks)
-		apiEndpoint.Get("/download/:file", api.DownloadFile)
+		apiEndpoint.POST("/save", api.SaveFile)
+		apiEndpoint.GET("/links", api.GetLinks)
+		apiEndpoint.GET("/:token/links", api.GetTokenLinks)
+		apiEndpoint.GET("/download/:file", api.DownloadFile)
 
 		private := vise.Group("/private")
 		private.Use(mw.BasicAuth(func(usr, pwd string) bool {
 			return usr == os.Getenv("VISE_USER") && pwd == os.Getenv("VISE_PWD")
 		}))
-		private.Get("/stats", func(c *echo.Context) error {
+		private.GET("/stats", func(c echo.Context) error {
 			return c.JSON(http.StatusOK, persistence.DbStats())
 		})
-		private.Get("/inspect", func(c *echo.Context) error {
+		private.GET("/inspect", func(c echo.Context) error {
 			d, err := persistence.Inspect()
 			if err != nil {
 				return err
@@ -74,8 +75,8 @@ func main() {
 		vise.Use(mw.Logger())
 		vise.Use(mw.Recover())
 
-		assets := http.FileServer(assetFS())
-		vise.Get("/", assets)
+		//assets := http.FileServer(assetFS())
+		//vise.GET("/", assets)
 		//vise.Get("/static/*", assets)
 
 		destroyer.Scan()
@@ -84,7 +85,9 @@ func main() {
 		if err != nil {
 			log.Fatal(err)
 		}
-		log.Fatal(http.ListenAndServe(":"+port, vise))
+		//log.Fatal(http.ListenAndServe(":"+port, vise))
+		vise.Run(standard.New(":" + port))
+
 	}
 	app.Run(os.Args)
 }

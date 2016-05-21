@@ -5,7 +5,7 @@ import (
 	"net/http"
 	"strconv"
 
-	"code.google.com/p/go-uuid/uuid"
+	"github.com/pborman/uuid"
 	"github.com/labstack/echo"
 
 	"github.com/nubunto/vise/persistence"
@@ -13,22 +13,26 @@ import (
 	"github.com/nubunto/vise/uppath"
 )
 
-func SaveFile(c *echo.Context) error {
+func SaveFile(c echo.Context) error {
 	req := c.Request()
-	req.ParseMultipartForm(16 << 20)
 
-	days, err := strconv.Atoi(c.Form("days"))
+	days, err := strconv.Atoi(c.FormValue("days"))
 	if err != nil {
 		return err
 	}
 
-	srcFile, fh, err := req.FormFile("file")
+	file, err := req.FormFile("file")
+	if err != nil {
+		return err
+	}
+
+	srcFile, err := file.Open()
 	if err != nil {
 		return err
 	}
 	defer srcFile.Close()
 
-	userToken := c.Form("user-token")
+	userToken := c.FormValue("user-token")
 	if len(userToken) == 0 {
 		userToken = uuid.New()
 	}
@@ -37,7 +41,7 @@ func SaveFile(c *echo.Context) error {
 		UserToken:     userToken,
 		FileToken:     fileToken,
 		DaysAvailable: days,
-		Filename:      fh.Filename,
+		Filename:      file.Filename,
 	}
 	err = uppath.UploadFile(boltFile, srcFile)
 	if err != nil {
@@ -52,13 +56,13 @@ func SaveFile(c *echo.Context) error {
 	return c.JSON(http.StatusOK, FileUploadResponse{ResponseOK, userToken})
 }
 
-func uriBuilder(c *echo.Context) func(string) string {
+func uriBuilder(c echo.Context) func(string) string {
 	return func(token string) string {
 		return c.Echo().URI(DownloadFile, token)
 	}
 }
 
-func GetLinks(c *echo.Context) error {
+func GetLinks(c echo.Context) error {
 	matchAll := func(string) bool {
 		return true
 	}
@@ -69,7 +73,7 @@ func GetLinks(c *echo.Context) error {
 	return c.JSON(http.StatusOK, linksResponse)
 }
 
-func GetTokenLinks(c *echo.Context) error {
+func GetTokenLinks(c echo.Context) error {
 	userToken := c.P(0)
 	matchSpecific := func(b string) bool {
 		return b == userToken
@@ -89,7 +93,7 @@ func getTokenLinks(match func(string) bool, uriBuilder func(string) string) (*Li
 	return &LinksResponse{ResponseOK, links}, nil
 }
 
-func DownloadFile(c *echo.Context) error {
+func DownloadFile(c echo.Context) error {
 	fileToken := c.P(0)
 
 	src, err := persistence.FindFile([]byte(fileToken))
